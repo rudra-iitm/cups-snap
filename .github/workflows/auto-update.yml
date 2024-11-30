@@ -2,19 +2,44 @@ name: Push new tag update to stable branch
 
 on:
   schedule:
-    # Daily for now
+    # Daily at 7:09 UTC
     - cron: '9 7 * * *'
   workflow_dispatch:
+    inputs:
+      workflow_choice:
+        description: "Choose YAML to update"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - snapcraft
+          - rockcraft
+          - both
 
 jobs:
   update-snapcraft-yaml:
+    if: ${{ github.event_name == 'schedule' || github.event.inputs.workflow_choice == 'snapcraft' || github.event.inputs.workflow_choice == 'both' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout this repo
         uses: actions/checkout@v3
-      - name: Run desktop-snaps action  
+      - name: Run desktop-snaps action
         uses: ubuntu/desktop-snaps@stable
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repo: ${{ github.repository }}
           version-schema: 'v(\d+\.\d+\.\d+)'
+
+  update-rockcraft-yaml:
+    if: ${{ github.event_name == 'schedule' || github.event.inputs.workflow_choice == 'rockcraft' || github.event.inputs.workflow_choice == 'both' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v3
+      - name: Run desktop-snaps action
+        uses: ubuntu/desktop-snaps@stable
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repo: ${{ github.repository }}
+          rock-version-schema: 'v(\d+\.\d+\.\d+)'
+          yaml-path: 'rock/rockcraft.yaml'
