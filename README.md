@@ -321,3 +321,155 @@ Links on other platforms:
 * [Pull request on snapd-glib for adding support for exit codes returned by snapctl commands issued via library function (merged)](https://github.com/snapcore/snapd-glib/pull/97)
 * [Pull request on CUPS to add Snap mediation (merged)](https://github.com/OpenPrinting/cups/pull/269)
 * [Trello card about adding API to check client Snaps whether they plug a certain interface](https://trello.com/c/9IJToylf/1215-snapd-api-for-checking-client-snaps-whether-they-plug-a-given-interface)
+---
+
+# The OpenPrinting CUPS Rock
+
+## Documentation
+- `README.md`: This file contains introduction,  instructions and details about the setup, usage, and configuration of the CUPS Rock.
+- `TESTING.md`: This file contains detailed steps for testing the CUPS Rock functionality.
+
+## Install from Docker Hub
+### Prerequisites
+
+**Docker Installed**: Ensure Docker is installed on your system. You can download it from the [official Docker website](https://www.docker.com/get-started).
+```sh
+  sudo snap install docker
+```
+
+- `cups-ipp-utils`
+- `cups-client`
+
+Install the required packages on docker-host using the following commands:
+
+```sh
+  sudo apt-get update
+  sudo apt-get install cups-ipp-utils cups-client -y
+```
+
+### Step-by-Step Guide
+
+You can pull the `cups` Docker image from either the GitHub Container Registry or Docker Hub.
+
+**From GitHub Container Registry** <br>
+To pull the image from the GitHub Container Registry, run the following command:
+```sh
+  sudo docker pull ghcr.io/openprinting/cups:latest
+```
+
+To run the container after pulling the image from the GitHub Container Registry, use:
+```sh
+sudo docker run -d --name cups --network host \
+    -e CUPS_PORT=<CUPS_PORT> \
+    -e CUPS_ADMIN=<CUPS_ADMIN> \
+    -e CUPS_PASSWORD=<CUPS_PASSWORD> \
+    ghcr.io/openprinting/cups:latest
+```
+
+**From Docker Hub** <br>
+Alternatively, you can pull the image from Docker Hub, by running:
+```sh
+  sudo docker pull openprinting/cups:latest
+```
+
+To run the container after pulling the image from Docker Hub, use:
+```sh
+sudo docker run -d --name cups --network host \
+    -e CUPS_PORT=<CUPS_PORT> \
+    -e CUPS_ADMIN=<CUPS_ADMIN> \
+    -e CUPS_PASSWORD=<CUPS_PASSWORD> \
+    openprinting/cups:latest
+```
+
+- `CUPS_ADMIN` and `CUPS_PASSWORD` are optional administrative credentials for accessing CUPS.
+- If credentials are not provided, you can view the randomly generated administrative credentials for your container using the following command:
+    ```sh
+      sudo docker exec cups cat /etc/cups/cups-credentials
+    ```
+- `CUPS_PORT` is an optional flag used to start CUPS on a specified port. If not provided, it will start on the default port 631.
+- **The container must be started in `--network host` mode** to allow the Printer-Application instance inside the container to access and discover printers available in the local network where the host system is in.
+- Alternatively using the internal network of the Docker instance (`-p <port>:8000` instead of `--network host -e CUPS_PORT=<port>`) only gives access to local printers running on the host system itself.
+
+## Setting Up and Running CUPS Rock locally
+
+### Prerequisites
+
+1. **Docker Installed**: Ensure Docker is installed on your system. You can download it from the [official Docker website](https://www.docker.com/get-started).
+```sh
+  sudo snap install docker
+```
+
+2. **Rockcraft**: Rockcraft should be installed. You can install Rockcraft using the following command:
+```sh
+  sudo snap install rockcraft --classic
+```
+
+3. **Skopeo**: Skopeo should be installed to compile `.rock` files into Docker images. <br>
+**Note**: It comes bundled with Rockcraft.
+
+### Step-by-Step Guide
+
+#### 1. Build CUPS rock:
+
+The first step is to build the Rock from the `rockcraft.yaml`. This image will contain all the configurations and dependencies required to run CUPS.
+
+Open your terminal and navigate to the directory containing your `rockcraft.yaml`, then run the following command:
+
+```sh
+  rockcraft pack -v
+```
+
+#### 2. Compile to Docker Image:
+
+Once the rock is built, you need to compile docker image from it.
+
+```sh
+  sudo rockcraft.skopeo --insecure-policy copy oci-archive:<rock_image> docker-daemon:cups:latest
+```
+
+#### Run the CUPS Docker Container:
+
+```sh
+sudo docker run -d --name cups --network host \
+    -e CUPS_PORT=<CUPS_PORT> \
+    -e CUPS_ADMIN=<CUPS_ADMIN> \
+    -e CUPS_PASSWORD=<CUPS_PASSWORD> \
+    cups:latest
+```
+
+- `CUPS_ADMIN` and `CUPS_PASSWORD` are optional administrative credentials for accessing CUPS.
+- If credentials are not provided, you can view the randomly generated administrative credentials for your container using the following command:
+    ```sh
+      sudo docker exec cups cat /etc/cups/cups-credentials
+    ```
+- `CUPS_PORT` is an optional flag used to start CUPS on a specified port. If not provided, it will start on the default port 631.
+- **The container must be started in `--network host` mode** to allow the Printer-Application instance inside the container to access and discover printers available in the local network where the host system is in.
+- Alternatively using the internal network of the Docker instance (`-p <port>:8000` instead of `--network host -e CUPS_PORT=<port>`) only gives access to local printers running on the host system itself.
+
+### Accessing the CUPS Web Interface
+- The CUPS web interface can be accessed at `http://localhost:CUPS_PORT` to manage printers and check job statuses.
+
+## CUPS Commands
+To use use the cups's command line utilities acting on the CUPS image, proceed the commands with following format:
+
+1. Use Docker's -u flag to specify the CUPS_ADMIN user
+```sh
+  sudo docker exec -u "${CUPS_ADMIN}" cups <command>
+```
+Example:
+To add a printer from inside the container:
+```sh
+  sudo docker exec -u "${CUPS_ADMIN}" cups lpadmin -p <printer>
+```
+
+2. Use `cups-client` on Docker-host to execute CUPS commands:s
+```sh
+  CUPS_SERVER=localhost:<port> <command>
+```
+
+Example:
+To check the print status:
+```sh
+  CUPS_SERVER=localhost:CUPS_PORT lpstat -W completed
+```
+**Note to use cups administrative task pass -U flag with lpadmin command**
